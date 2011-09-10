@@ -1,4 +1,7 @@
 __url__ = 'http://python-minus.googlecode.com/svn/trunk/minus.py'
+__changelog__ = '''
+changes from r20: made the use of `json` conditional upon the method available
+'''
 __license__ = '''
 Copyright (c) 2011 Andrei Vlad Vacariu
 
@@ -48,7 +51,13 @@ class User(object):
             self.login_data = urllib.urlencode(params)
             reponse = self.opener.open(url, self.login_data)
             
-            parsed = json.loads(reponse.readlines()[0])
+            json_str = reponse.readlines()[0]
+            if hasattr(json,'loads'):
+                parsed = json.loads( json_str )
+            elif hasattr(json,'read'):
+                parsed = json.read( json_str )
+            else:
+                raise Exception("Unknown `json` module")
             if parsed["success"] == False:
                 raise Exception("Sign in failed.")
             return parsed
@@ -227,5 +236,13 @@ def _dopost(url, params=None, payload=None):
     return _parseResponse(response) 
 
 def _parseResponse(response):
-    return json.loads(''.join(response.readlines()))    # response.readlines() is a list of many parts of the json.
+    # response.readlines() is a list of many parts of the json.
+    json_str = ''.join(response.readlines())
+    if hasattr(json,'loads'):
+        parsed = json.loads( json_str )
+    elif hasattr(json,'read'):
+        parsed = json.read( json_str )
+    else:
+        raise Exception("Unknown `json` module")
+    return parsed
 

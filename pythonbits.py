@@ -43,6 +43,7 @@ import tempfile
 import microdata
 import os
 import json
+from minus_api import MinUsAPI
 import MultipartPostHandler
 from xml.dom.minidom import Document, parse
 from hashlib import md5 # for user error feedback reports
@@ -52,6 +53,7 @@ try:
 	from HTMLParser import HTMLParser
 	__converter = HTMLParser()
 except ImportError:
+	HTMLParser = None # please, PyCharm, shut up
 	pass
 
 def __logerror(msg):
@@ -597,16 +599,13 @@ class ImageUploader(object):
 	"""
 	Superclass (how /does/ one define an interface in Python?) for all of
 	the image uploading services.
-
-	Construct the service with the list of local filenames to upload,
-	then ask it for the URLs that it has generated for those files.
 	"""
-	def __init__(self, files):
-		self.files = files
+	def __init__(self):
+		pass
 
-	def get_urls(self):
+	def get_urls(self, files):
 		"""
-
+		:param files: the sequence of local filenames to upload.
 		:return: a sequence (hopefully in the same order as `files`) of
 			URLs where I have uploaded your files.
 		"""
@@ -691,25 +690,42 @@ class ScreenExtractor(object):
 				(msg, out_fn)
 		raise Exception( err_msg )
 
+class MinUs(ImageUploader):
+	def __init__(self):
+		ImageUploader.__init__(self)
+		global conf
+		self._username = conf.strings["min.us.username"]
+		self._password = conf.strings["min.us.password"]
+	def get_urls(self, files):
+		api = MinUsAPI()
+		api.login(self._username, self._password)
+		gallery, _ = api.create_gallery()
+		results = []
+		for fn in files:
+			fid, url = api.upload_item( gallery, fn )
+			results.append( url )
+		api.logout()
+		return results
+
 class Imgur(ImageUploader):
-	def __init__(self, files):
-		ImageUploader.__init__(self, files)
+	def __init__(self):
+		ImageUploader.__init__(self)
 		global conf
 		self.imageurl = []
 		self.key = conf.strings["imgur_key"]
-		self._upload()
 
-	def get_urls(self):
+	def get_urls(self, files):
+		self._upload( files )
 		return self.imageurl
 
-	def _upload(self):
+	def _upload(self, files):
 		opener = urllib2.build_opener(MultipartPostHandler.MultipartPostHandler)
 		tries = 0
 		max_tries = 3
 		while tries < max_tries:
 			tries += 1
 			try:
-				for img in self.files:
+				for img in files:
 					params = ({'key' : self.key.decode('utf-8').encode('utf-8'), 'image' : open(img, "rb")})
 					socket = opener.open("http://api.imgur.com/2/upload.json", params)
 					json_str = socket.read()
@@ -748,13 +764,21 @@ def updateConfig():
 if __name__ == "__main__":
 	from optparse import OptionParser
 
+	img_uploaders = {'imgur':Imgur, 'minus':MinUs}
+
 	usage = 'Usage: %prog [OPTIONS] "MOVIENAME/SERIESNAME" FILENAME'
 	parser = OptionParser(usage=usage, version="%%prog %s" % __version_str__)
 	parser.add_option("-e", "--episode", type="string", action="store", dest="tv_episode",
 		help="Provides the TV episode identifier (1x2 or S01E02)")
 	parser.add_option("-u", "--update", action="store_true", dest="update",
 		help="update the config hints from the central github repository")
-	parser.add_option("-s", "--screenshots", type="int", action="store", dest="screenshots", help="Set the amount of screenshots, max 7")
+	parser.add_option("-s", "--screenshots", type="int", action="store",
+		dest="screenshots", help="Set the amount of screenshots, max 7")
+	parser.add_option("-i", "--imager", type="choice", action="store",
+		choices=img_uploaders.keys(),
+		dest="img_uploader",
+		help=("One of the following upload services: %s"
+			  % ",".join(img_uploaders.keys())))
 	options, args = parser.parse_args()
 
 	tv_episode = None
@@ -783,6 +807,9 @@ if __name__ == "__main__":
 	except Exception, ex:
 		print >> sys.stderr, "Unable to read config:", ex
 		updateConfig()
+
+	up_class = img_uploaders[options.img_uploader]
+	uploader = up_class()
 
 	search_string = args[0]
 	filename = args[1]
@@ -836,8 +863,9 @@ if __name__ == "__main__":
 	else:
 		extractor = ScreenExtractor(filename)
 	image_filenames = extractor.extract()
-	imgur = Imgur(image_filenames)
-	image_urls = imgur.get_urls()
+	if not image_filenames:
+		raise ValueError("Expected to have image files but found none")
+	image_urls = uploader.get_urls( image_filenames )
 	if image_urls:
 		print "[quote][align=center]" 
 		for url in image_urls:

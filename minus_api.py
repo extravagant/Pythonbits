@@ -1,3 +1,7 @@
+"""
+Discovered, with some specification bug-fixes, from the following URL:
+https://github.com/minus-development/MinusAPI/blob/master/REST_API.markdown
+"""
 from hashlib import md5
 import json
 import logging
@@ -20,6 +24,19 @@ class MinUsAPI(object):
 		self._authenticated = False
 
 	def upload_one_item(self, local_path, username, password ):
+		"""
+		Uploads one item, along with all the housekeeping of logging in,
+		creating a gallery and then logging out.
+
+		This would be a class method, but it is unclear if @classmethod
+		works on older Pythons.
+
+		:param local_path: the filesystem path you wish to upload.
+		:param username: the min.us username to use
+		:param password: the min.us password to use
+		:returns: a tuple containing the file-id and the i.minus.com URL
+			for your convenience
+		"""
 		self.login(username, password)
 		gallery_id, _ = self.create_gallery()
 		result = self.upload_item( gallery_id, local_path )
@@ -27,6 +44,12 @@ class MinUsAPI(object):
 		return result
 
 	def login(self, username, password ):
+		"""
+		Does exactly what you would expect.
+
+		:raises IOError: if the server doesn't answer with any indication,
+		:raises ValueError: if the server specifically said unsuccessful
+		"""
 		signon_params = {'username':username, 'password1':password}
 		signon_data = urlencode( signon_params )
 		url = MinUsAPI.MIN_US_API_SIGNIN
@@ -41,10 +64,21 @@ class MinUsAPI(object):
 		if 'success' not in obj:
 			raise IOError("SignIn did not output success")
 		if not obj['success']:
-			raise IOError("SignIn did not indicate success")
+			raise ValueError("SignIn did not indicate success")
 		self._authenticated = True
 
 	def create_gallery(self):
+		"""
+		Does exactly what you would expect.
+
+		You must have already called ``login()`` before this method will
+		succeed.
+
+		:raises ValueError: if the server does not answer with both the
+			editor-id and reader-id values.
+		:returns: a tuple containing the editor-id and reader-id for the
+			newly created Gallery.
+		"""
 		url = MinUsAPI.MIN_US_API_CREATE_GALLERY
 		res = self._opener.open( url )
 		self._check_result( res, url )
@@ -65,6 +99,18 @@ class MinUsAPI(object):
 		return editor_id, reader_id
 
 	def upload_item(self, gallery_id, local_path ):
+		"""
+		Uploads the specified local file into the specified gallery.
+
+		You must already be logged in to use this method.
+
+		:param gallery_id: the editor-id for the target gallery
+		:param local_path: the file system path you wish to send.
+		:returns: a tuple containing the newly created file's id and
+				the ``i.minus.com`` URL for that file
+		:raises ValueError: if the server does not respond with the newly
+				created file's id
+		"""
 		# get this out of the way early, since if there is no file,
 		# there is no further action
 		basename = os.path.basename( local_path )
@@ -110,6 +156,9 @@ class MinUsAPI(object):
 		return file_id, file_url
 
 	def logout(self):
+		"""
+		Does exactly what you would expect.
+		"""
 		if not self._authenticated:
 			return
 		url = MinUsAPI.MIN_US_API_SIGNOUT
@@ -123,6 +172,13 @@ class MinUsAPI(object):
 		self._authenticated = False
 
 	def _check_result(self, res, action ):
+		"""
+		Ensures the result is okay, raising an Error if not.
+
+		:param res: the `Response` object from `urllib2.urlopen`
+		:param action: the action used to report a helpful error message.
+		:raise IOError: if the response is not HTTP-200
+		"""
 		self._log.debug("RES :dir=%s %s", dir(res), res)
 		if res.code != 200:
 			raise IOError("Unable to %s: %s %s %s" %

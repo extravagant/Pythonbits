@@ -593,50 +593,63 @@ def findMediaInfo( path ):
 		exit(1)
 	return mediainfo
 
-class Imgur(object):
-	def __init__(self, path, shots = 2):
-		self.path = path
-		self.imageurl = []
-		self.key = conf.strings["imgur_key"]
-		self.tries = 0
+class ImageUploader(object):
+	"""
+	Superclass (how /does/ one define an interface in Python?) for all of
+	the image uploading services.
+
+	Construct the service with the list of local filenames to upload,
+	then ask it for the URLs that it has generated for those files.
+	"""
+	def __init__(self, files):
+		self.files = files
+
+	def get_urls(self):
+		"""
+
+		:return: a sequence (hopefully in the same order as `files`) of
+			URLs where I have uploaded your files.
+		"""
+		pass
+
+class ScreenExtractor(object):
+	def __init__(self, media, number_of_screens=2):
+		self.media = media
 		self.duration = 0
-		self.ffmpeg = ''
+		shots = number_of_screens
 		if shots < 2:
 			self.shots = 2
-			sys.stderr.write('Number of screenshots increased to 2\n')
+			print >> sys.stderr, 'Number of screenshots increased to 2'
 		elif shots > 7:
 			self.shots = 7
-			sys.stderr.write('Number of screenshots limited to 7\n')
+			print >> sys.stderr, 'Number of screenshots limited to 7'
 		else:
 			self.shots = shots
-        
-
 	def getDuration(self):
 		try:
-			self.ffmpeg = subprocess.Popen([r"ffmpeg","-i",self.path], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+			ffmpeg = subprocess.Popen(
+				["ffmpeg", "-i", self.media],
+				stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		except OSError:
-			sys.stderr.write("Error: Ffmpeg not installed, refer to http://www.ffmpeg.org/download.html for installation")
-			exit(1)
-		ffmpeg_out = self.ffmpeg.stdout.read()
+			raise Exception("Error: Ffmpeg not installed,\n" \
+				" refer to http://www.ffmpeg.org/download.html for installation")
+		ffmpeg_out = ffmpeg.stdout.read()
 		ffmpeg_duration = re.findall(r'Duration:\D(\d{2}):(\d{2}):(\d{2})', ffmpeg_out)
 		if not ffmpeg_duration:
-			# the odds of a filename collision on an md5 digest are very small
-			out_fn = '%s.txt' % md5(ffmpeg_out).hexdigest()
-			err_f = open(out_fn, 'wb')
-			err_f.write( ffmpeg_out )
-			err_f.close()
-			err_msg = ("Expected ffmpeg to mention 'Duration' but it did not;\n"+
-				"Please copy the contents of '%s' to http://pastebin.com/\n"+
-				" and send the pastebin link to the bB forum. Sorry.") % \
-					out_fn
-			raise Exception( err_msg )
+			self._report_error( "Expecting to find 'Duration' but did not", ffmpeg_out )
 		dur = ffmpeg_duration[0]
 		dur_hh = int(dur[0])
 		dur_mm = int(dur[1])
 		dur_ss = int(dur[2])
 		self.duration = dur_hh * 3600 + dur_mm * 60 + dur_ss
+		return self.duration
 
-	def upload(self):
+	def extract(self):
+		"""
+		Extract the screen grabs from the provided media file.
+
+		:return: a sequence of local file paths containing the screen grabs.
+		"""
 		self.getDuration()
 		# Take screenshots at even increments between 20% and 80% of the duration
 		stops = range(20,81,60/(self.shots-1))
@@ -644,41 +657,79 @@ class Imgur(object):
 		try:
 			count=0
 			for stop in stops:
-				imgs.append(tempdir()+"screen%d.png" % count)
-				subprocess.Popen([r"ffmpeg","-ss",str((self.duration * stop)/100), "-vframes", "1", "-i", self.path , "-y", "-sameq", "-f", "image2", imgs[-1] ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT).wait()
+				fn = tempdir()+"screen%d.png" % count
+				imgs.append( fn )
+				proc = subprocess.Popen([r"ffmpeg",
+								  "-ss", str((self.duration * stop)/100),
+								  "-vframes", "1", "-i", self.media,
+								  "-y", "-sameq",
+								  "-f", "image2",
+								  fn ],
+					stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+				_sout, _serr = proc.communicate()
+				rc = proc.wait()
+				if rc:
+					self._report_error("FFmpeg exploded",
+						"STDOUT:%s\nSTDERR:%s" % (_sout, _serr))
 				count+=1
 		except OSError:
-			sys.stderr.write("Error: Ffmpeg not installed, refer to http://www.ffmpeg.org/download.html for installation")
+			print >> sys.stderr, \
+				"Error: Ffmpeg not installed,\n" \
+				"refer to http://www.ffmpeg.org/download.html for installation"
 			exit(1)
+		return imgs
+
+	def _report_error(self, msg, text ):
+		# the odds of a filename collision on an md5 digest are very small
+		out_fn = '%s.txt' % md5(text).hexdigest()
+		err_f = open(out_fn, 'wb')
+		err_f.write( text )
+		err_f.close()
+		err_msg = ("%s\n"+
+			"Please copy the contents of '%s' to http://pastebin.com/\n"+
+			" and send the pastebin link to the bB forum. Sorry.") % \
+				(msg, out_fn)
+		raise Exception( err_msg )
+
+class Imgur(ImageUploader):
+	def __init__(self, files):
+		ImageUploader.__init__(self, files)
+		global conf
+		self.imageurl = []
+		self.key = conf.strings["imgur_key"]
+		self._upload()
+
+	def get_urls(self):
+		return self.imageurl
+
+	def _upload(self):
 		opener = urllib2.build_opener(MultipartPostHandler.MultipartPostHandler)
-		
-		try:
-			for img in imgs:
-				params = ({'key' : self.key.decode('utf-8').encode('utf-8'), 'image' : open(img, "rb")})
-				socket = opener.open("http://api.imgur.com/2/upload.json", params)
-				json_str = socket.read()
-				if hasattr(json,'loads'):
-					read = json.loads( json_str )
-				elif hasattr(json,'read'):
-					read = json.read( json_str )
-				else:
-					err_msg = "I cannot decipher your `json`;\n" + \
-						"please report the following output to the bB forum:\n" + \
-						("%s" % dir(json))
-					raise Exception( err_msg )
-				self.imageurl.append(read['upload']['links']['original'])
-				socket.close()
-				os.remove(img)
-			return True
-		except urllib2.URLError, s:
-			if self.tries < 3:
-				self.tries += 1
-				sys.stderr.write('Connection timed out, retrying to upload screenshots to imgur. This is try: ')
-				sys.stderr.write(str(self.tries))
-				sys.stderr.write('\n')
-				sys.stderr.write(str(s))
-				self.upload()
-			return True
+		tries = 0
+		max_tries = 3
+		while tries < max_tries:
+			tries += 1
+			try:
+				for img in self.files:
+					params = ({'key' : self.key.decode('utf-8').encode('utf-8'), 'image' : open(img, "rb")})
+					socket = opener.open("http://api.imgur.com/2/upload.json", params)
+					json_str = socket.read()
+					if hasattr(json,'loads'):
+						read = json.loads( json_str )
+					elif hasattr(json,'read'):
+						read = json.read( json_str )
+					else:
+						err_msg = "I cannot decipher your `json`;\n" + \
+							"please report the following output to the bB forum:\n" + \
+							("%s" % dir(json))
+						raise Exception( err_msg )
+					self.imageurl.append(read['upload']['links']['original'])
+					socket.close()
+					os.remove(img)
+				return True
+			except urllib2.URLError, s:
+				print >> sys.stderr, \
+					'Connection timed out, retrying to upload screenshots to imgur.\n' \
+					'This is try %d of %d:\n%s' % ( tries, max_tries, s )
 
 def updateConfig():
 	update_url = "https://raw.github.com/Ichabond/Pythonbits/master/config.xml"
@@ -781,12 +832,15 @@ if __name__ == "__main__":
 	print "[/quote]"
 	print "[b]Screenshots:[/b]"
 	if options.screenshots:
-		imgur = Imgur(filename,int(options.screenshots))
+		extractor = ScreenExtractor(filename, int(options.screenshots))
 	else:
-		imgur = Imgur(filename)
-	if imgur.upload():
+		extractor = ScreenExtractor(filename)
+	image_filenames = extractor.extract()
+	imgur = Imgur(image_filenames)
+	image_urls = imgur.get_urls()
+	if image_urls:
 		print "[quote][align=center]" 
-		for url in imgur.imageurl:
+		for url in image_urls:
 			print "[img=%s]" % url
 		print "[/align][/quote]"
 	mediainfo = findMediaInfo(filename)

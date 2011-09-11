@@ -6,7 +6,7 @@
          (since they are limited to 10gb of upload)
     /-->
     <string name='min.us.username'>a3583836</string>
-    <string name='min.us.password1'>a3583836@nepwk.com</string>
+    <string name='min.us.password'>a3583836@nepwk.com</string>
 	<string name="imdb_director_re">
 		Director.*\n+\D*\d&gt;\D*&lt;a\s*href=&quot;/name/nm\d+/&quot;&gt;([\w\-\d\s]+)&lt;/a&gt;
 	</string>

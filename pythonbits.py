@@ -776,7 +776,7 @@ if __name__ == "__main__":
 		dest="screenshots", help="Set the amount of screenshots, max 7")
 	parser.add_option("-i", "--imager", type="choice", action="store",
 		choices=img_uploaders.keys(),
-		dest="img_uploader",
+		dest="img_uploader", default='imgur', # specify one when they don't
 		help=("One of the following upload services: %s"
 			  % ",".join(img_uploaders.keys())))
 	options, args = parser.parse_args()

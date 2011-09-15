@@ -43,6 +43,7 @@ import tempfile
 import microdata
 import os
 import json
+from BeautifulSoup import BeautifulSoup
 from minus_api import MinUsAPI
 import MultipartPostHandler
 from xml.dom.minidom import Document, parse
@@ -747,6 +748,51 @@ class Imgur(ImageUploader):
 					'Connection timed out, retrying to upload screenshots to imgur.\n' \
 					'This is try %d of %d:\n%s' % ( tries, max_tries, s )
 
+def get_tv_rage_episode_summary( episode_url ):
+	"""
+	:param episode_url: the tvrage.com URL that points to the target episode
+	:returns: a unicode string containing the episode summary, or None on error
+	"""
+	def get_first_unicode_text( elem ):
+		txt_contents = elem.contents
+		if not txt_contents:
+			return None
+		# yup, weird, it is a list but the first item is None
+		# happens here: http://www.tvrage.com/shows/id-14977/episodes/639524
+		txt = txt_contents[0]
+		if not txt:
+			return None
+		result = txt.encode('utf-8')
+		result = result.strip()
+		return result
+	opener = _MyOpener()
+	ep_html = opener.open( episode_url)
+	soup = BeautifulSoup( ep_html )
+	# the easy botton?
+	synop = soup.find('div',{'class':'show_synopsis'})
+	if synop:
+		return get_first_unicode_text( synop )
+
+	# looks like we're doing this the hard way...
+	_h1 = soup.find('h1')
+	if not _h1:
+		return None
+	_div = _h1.findNextSibling('div')
+	if not _div:
+		return None
+	_span = _div.find('span')
+	if not _span:
+		return None
+	_div2 = _span.find('div')
+	if not _div2:
+		return None
+	div_list = _div2.findAll('div')
+	if not div_list:
+		return None
+	txt_div = div_list[1]
+	result = get_first_unicode_text( txt_div )
+	return result
+
 def updateConfig():
 	update_url = "https://raw.github.com/Ichabond/Pythonbits/master/config.xml"
 	opener = _MyOpener()
@@ -849,8 +895,14 @@ if __name__ == "__main__":
 			'Show Name',
 			'Show URL',
 			'Started',
-			'Status'
+			'Status',
+			'Summary' # this is added below, not from the API :-(
 		]
+		if 'Episode URL' in results:
+			ep_url = results[ 'Episode URL' ]
+			ep_summary = get_tv_rage_episode_summary( ep_url )
+			if ep_summary:
+				results['Summary'] = ep_summary
 		for field_name in interesting_fields:
 			if not field_name in results:
 				continue

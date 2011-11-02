@@ -708,6 +708,51 @@ class MinUs(ImageUploader):
 		api.logout()
 		return results
 
+class BaconBits(ImageUploader):
+	def __init__(self):
+		ImageUploader.__init__(self)
+		global conf
+		self.imageurl = []
+		self.api_url = "https://images.baconbits.org/upload.php"
+		self.img_template = "https://images.baconbits.org/images/%s"
+	def get_urls(self, files):
+		results = []
+		if self._upload( files ):
+			results = self.imageurl
+		return results
+	def _upload(self, files):
+		opener = urllib2.build_opener(MultipartPostHandler.MultipartPostHandler)
+		tries = 0
+		max_tries = 3
+		result = False
+		while tries < max_tries:
+			tries += 1
+			try:
+				for img in files:
+					params = ({'ImageUp' : open(img, "rb")})
+					socket = opener.open(self.api_url, params)
+					json_str = socket.read()
+					if hasattr(json,'loads'):
+						read = json.loads( json_str )
+					elif hasattr(json,'read'):
+						read = json.read( json_str )
+					else:
+						err_msg = "I cannot decipher your `json`;\n" + \
+							"please report the following output to the bB forum:\n" + \
+							("%s" % dir(json))
+						raise Exception( err_msg )
+					socket.close()
+					the_url = self.img_template % read['ImgName']
+					self.imageurl.append( the_url )
+					os.remove(img)
+				result = True
+				break
+			except urllib2.URLError, s:
+				print >> sys.stderr, \
+					'Connection timed out, retrying to upload screenshots to imgur.\n' \
+					'This is try %d of %d:\n%s' % ( tries, max_tries, s )
+		return result
+
 class Imgur(ImageUploader):
 	def __init__(self):
 		ImageUploader.__init__(self)
@@ -716,13 +761,16 @@ class Imgur(ImageUploader):
 		self.key = conf.strings["imgur_key"]
 
 	def get_urls(self, files):
-		self._upload( files )
-		return self.imageurl
+		result = []
+		if self._upload( files ):
+			result = self.imageurl
+		return result
 
 	def _upload(self, files):
 		opener = urllib2.build_opener(MultipartPostHandler.MultipartPostHandler)
 		tries = 0
 		max_tries = 3
+		result = False
 		while tries < max_tries:
 			tries += 1
 			try:
@@ -742,11 +790,13 @@ class Imgur(ImageUploader):
 					self.imageurl.append(read['upload']['links']['original'])
 					socket.close()
 					os.remove(img)
-				return True
+				result = True
+				break
 			except urllib2.URLError, s:
 				print >> sys.stderr, \
 					'Connection timed out, retrying to upload screenshots to imgur.\n' \
 					'This is try %d of %d:\n%s' % ( tries, max_tries, s )
+		return result
 
 def get_tv_rage_episode_summary( episode_url ):
 	"""
@@ -810,7 +860,7 @@ def updateConfig():
 if __name__ == "__main__":
 	from optparse import OptionParser
 
-	img_uploaders = {'imgur':Imgur, 'minus':MinUs}
+	img_uploaders = {'bb':BaconBits, 'imgur':Imgur, 'minus':MinUs}
 
 	usage = 'Usage: %prog [OPTIONS] "MOVIENAME/SERIESNAME" FILENAME'
 	parser = OptionParser(usage=usage, version="%%prog %s" % __version_str__)
@@ -822,7 +872,8 @@ if __name__ == "__main__":
 		dest="screenshots", help="Set the amount of screenshots, max 7")
 	parser.add_option("-i", "--imager", type="choice", action="store",
 		choices=img_uploaders.keys(),
-		dest="img_uploader", default='imgur', # specify one when they don't
+		dest="img_uploader",
+		default='bb',
 		help=("One of the following upload services: %s"
 			  % ",".join(img_uploaders.keys())))
 	options, args = parser.parse_args()

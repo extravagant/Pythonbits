@@ -1,4 +1,4 @@
-<?xml version="1.0" ?>
+<?xml version="1.0" ?><!--:vim:noexpandtab:-->
 <pythonbits>
     <!-- currently, min.us doesn't require any kind of verification
          to create a new account, therefore it may be possible to
@@ -7,6 +7,11 @@
     /-->
     <string name='min.us.username'>a3583836</string>
     <string name='min.us.password'>a3583836@nepwk.com</string>
+	<!-- registered to a3701155@nepwk.com -->
+	<string name='imageshack.us.key'>5ZOQHXPN5ef5f9dea3b86331599a09e4e84c9034</string>
+	<string name="imgur_key">
+		bc1d6b50ff5dc9a563ec01583bbd5677
+	</string>
 	<string name="imdb_director_re">
 		Director.*\n+\D*\d&gt;\D*&lt;a\s*href=&quot;/name/nm\d+/&quot;&gt;([\w\-\d\s]+)&lt;/a&gt;
 	</string>
@@ -91,9 +96,6 @@
 	<string name="imdb_url_re">
 		^(?:http://)?(?:www\.)?imdb\.com/title/tt\d+/?$
 	</string>
-	<string name="imgur_key">
-		bc1d6b50ff5dc9a563ec01583bbd5677
-	</string>
 	<string name="imdb_company_re">
 		/company/co\d+[^&gt;]+&gt;\n*([^&lt;]+)
 	</string>
@@ -115,7 +117,7 @@
 	<string name="google_youtube_result_re">
 		&lt;a href=&quot;(http://www.youtube.com/watch\?v=[\w\d]+)&quot; class=l&gt;(.*?)(?=&lt;/a&gt;)
 	</string>
-    <string name="tvrage_quickinfo">
-        http://services.tvrage.com/tools/quickinfo.php?show=%(query)s&amp;ep=%(episode_cross)s
-    </string>
+	<string name="tvrage_quickinfo">
+		http://services.tvrage.com/tools/quickinfo.php?show=%(query)s&amp;ep=%(episode_cross)s
+	</string>
 </pythonbits>

@@ -86,10 +86,10 @@ def extract( text_or_file ):
 	return run_scopes( soup )
 
 if __name__ == '__main__':
-	extract("""<html>
+	print extract("""<html>
 <body>
 <div itemscope itemtype="urn:Fred">
-	<span itemprop='name'>Freddy Mercury</span>
+	<span itemprop='name'>Tommy&#x27;s Treehouse</span>
 	<div itemscope itemtype="urn:Address">
 		<span itemprop='city'>Topeka</span>
 		<span itemprop='state'>Missouri</span>

@@ -41,7 +41,21 @@ def run_scope( item_type ):
 				val = int(txt)
 			return chr( val )
 		p_value = re.sub( HEX_CHAR_RE, unescaper, p_value )
-		result[ '%s/%s' % (i_type, p_name) ] = p_value
+		result_key = '%s/%s' % (i_type, p_name)
+		if result_key in result:
+			# a multi-value
+			old_value = result[ result_key ]
+			if isinstance(old_value, str) \
+			or isinstance(old_value, unicode):
+				new_value = [ old_value, p_value ]
+				result[ result_key ] = new_value
+			elif isinstance(old_value, list):
+				old_value.append( p_value )
+			else:
+				raise ValueError("What is %s?" % type(old_value))
+		else:
+			result[ result_key ] = p_value
+	# remove this item from the 'Soup tree
 	item_type.extract()
 	if not len(result):
 		result = None
@@ -90,6 +104,8 @@ if __name__ == '__main__':
 <body>
 <div itemscope itemtype="urn:Fred">
 	<span itemprop='name'>Tommy&#x27;s Treehouse</span>
+	<span itemprop='phone'>0800 22 33 55</span>
+	<span itemprop='phone'>1-800-555-1212</span>
 	<div itemscope itemtype="urn:Address">
 		<span itemprop='city'>Topeka</span>
 		<span itemprop='state'>Missouri</span>

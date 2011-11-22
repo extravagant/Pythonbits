@@ -528,12 +528,15 @@ class SearchImdb(object):
 			print >> sys.stderr, "Unable to read /plotsummary: ", ex
 			return False
 		match = re.findall(conf.strings["imdb_summary_re"], synopsisPage, re.MULTILINE)
-		if match:
-			self.summary = match
-			return True
-		elif self.shortdescription:
+		result = False
+		# prefer the microdata description, falling back to the regex one
+		if self.shortdescription:
 			self.summary = [self.shortdescription]
-			return True
+			result = True
+		elif match:
+			self.summary = match
+			result = True
+		return result
 
 	def findTrailer(self):
 

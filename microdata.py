@@ -11,6 +11,8 @@ def run_scope( item_type ):
 	:param item_type: the HTML element that has an ``itemtype`` attribute
 	:returns: a map containing the namespace-qualified item properties
 	"""
+	import re
+	HEX_CHAR_RE = re.compile(r'&#(x?[0-9A-Fa-f]+);')
 	result = {}
 	i_type = item_type['itemtype']
 	# print '<%s> isa %s' % (item_type.name, i_type)
@@ -23,7 +25,22 @@ def run_scope( item_type ):
 	props = item_type.findAll( attrs={'itemprop':True} )
 	for prop in props:
 		p_name = prop['itemprop']
-		p_value = prop.text
+		# we just want the first child but calling prop.children
+		# doesn't work, which explains this foolishness:
+		p_value = [p for p in prop.childGenerator()]
+		# print "P_VALUE=(((%s)))" % p_value
+		if len(p_value) == 0:
+			p_value = ''
+		elif len(p_value) > 0:
+			p_value = str(p_value[0]).strip()
+		def unescaper( ma ):
+			txt = ma.group(1)
+			if 'x' == txt[0]:
+				val = int(txt[1:], 16)
+			else:
+				val = int(txt)
+			return chr( val )
+		p_value = re.sub( HEX_CHAR_RE, unescaper, p_value )
 		result[ '%s/%s' % (i_type, p_name) ] = p_value
 	item_type.extract()
 	if not len(result):

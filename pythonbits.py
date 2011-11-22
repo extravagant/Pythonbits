@@ -481,7 +481,7 @@ class SearchImdb(object):
 
 		if 'http://schema.org/Movie/actors' in mitem:
 			_cast = mitem['http://schema.org/Movie/actors']
-			self.cast = re.split(r',', _cast)
+			self.cast = _cast
 		if 'http://schema.org/Movie/datePublished' in mitem:
 			self.releasedate = mitem['http://schema.org/Movie/datePublished']
 		if 'http://schema.org/Movie/description' in mitem:

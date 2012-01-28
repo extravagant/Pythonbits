@@ -11,11 +11,13 @@ def run_scope( item_type ):
 	:param item_type: the HTML element that has an ``itemtype`` attribute
 	:returns: a map containing the namespace-qualified item properties
 	"""
+	DEBUG = False
 	import re
-	HEX_CHAR_RE = re.compile(r'&#(x?[0-9A-Fa-f]+);')
+	HEX_CHAR_RE = re.compile(r'\&#(x?[0-9A-Fa-f]+);')
 	result = {}
 	i_type = item_type['itemtype']
-	# print '<%s> isa %s' % (item_type.name, i_type)
+	if DEBUG:
+		print '<%s> isa %s' % (item_type.name, i_type)
 	# have to run the sub-scopes first so we can delete them
 	# that prevents their attributes from showing up as ours
 	children = run_scopes( item_type )
@@ -28,7 +30,8 @@ def run_scope( item_type ):
 		# we just want the first child but calling prop.children
 		# doesn't work, which explains this foolishness:
 		p_value = [p for p in prop.childGenerator()]
-		# print "P_VALUE=(((%s)))" % p_value
+		if DEBUG:
+			print "P_VALUE=(((%s)))" % p_value
 		if len(p_value) == 0:
 			p_value = ''
 		elif len(p_value) > 0:
@@ -39,8 +42,11 @@ def run_scope( item_type ):
 				val = int(txt[1:], 16)
 			else:
 				val = int(txt)
-			return chr( val )
-		p_value = re.sub( HEX_CHAR_RE, unescaper, p_value )
+			result = chr( val )
+			if DEBUG:
+				print "UNESC(%s)=>(%s)" % (txt, result)
+			return result
+		p_value = HEX_CHAR_RE.sub( unescaper, p_value )
 		result_key = '%s/%s' % (i_type, p_name)
 		if result_key in result:
 			# a multi-value
@@ -59,6 +65,8 @@ def run_scope( item_type ):
 	item_type.extract()
 	if not len(result):
 		result = None
+	if DEBUG:
+		print "RESULT(((%s)))" % result
 	return result
 
 def run_scopes( starting_with ):
@@ -121,3 +129,4 @@ if __name__ == '__main__':
 </body>
 </html>
 """)
+# vim:noexpandtab:

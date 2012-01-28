@@ -479,23 +479,38 @@ class SearchImdb(object):
 			raise ValueError("Unable to find any microdata in IMDB result")
 		mitem = mdata[0]
 
-		if 'http://schema.org/Movie/actors' in mitem:
-			_cast = mitem['http://schema.org/Movie/actors']
-			self.cast = _cast
-		if 'http://schema.org/Movie/datePublished' in mitem:
-			self.releasedate = mitem['http://schema.org/Movie/datePublished']
-		if 'http://schema.org/Movie/description' in mitem:
-			self.shortdescription = mitem['http://schema.org/Movie/description']
-		if 'http://schema.org/Movie/director' in mitem:
-			_dir = mitem['http://schema.org/Movie/director']
-			self.director = re.split(r',', _dir)
-		if 'http://schema.org/Movie/duration' in mitem:
-			self.runtime = mitem['http://schema.org/Movie/duration']
-		if 'http://schema.org/Movie/genre' in mitem:
-			_genre = mitem['http://schema.org/Movie/genre']
-			self.genre = re.split(r',', _genre)
-		if 'http://schema.org/Movie/name' in mitem:
+		if 'http://schema.org/TVSeries/name' in mitem:
+			self.title = mitem['http://schema.org/TVSeries/name']
+			if 'http://schema.org/TVSeries/actors' in mitem:
+				_cast = mitem['http://schema.org/TVSeries/actors']
+				self.cast = _cast
+			if 'http://schema.org/TVSeries/datePublished' in mitem:
+				self.releasedate = mitem['http://schema.org/TVSeries/datePublished']
+			if 'http://schema.org/TVSeries/description' in mitem:
+				self.shortdescription = mitem['http://schema.org/TVSeries/description']
+			if 'http://schema.org/TVSeries/duration' in mitem:
+				self.runtime = mitem['http://schema.org/TVSeries/duration']
+			if 'http://schema.org/TVSeries/genre' in mitem:
+				_genre = mitem['http://schema.org/TVSeries/genre']
+				if _genre is not None:
+					self.genre = _genre
+		elif 'http://schema.org/Movie/name' in mitem:
 			self.title = mitem['http://schema.org/Movie/name']
+			if 'http://schema.org/Movie/actors' in mitem:
+				_cast = mitem['http://schema.org/Movie/actors']
+				self.cast = _cast
+			if 'http://schema.org/Movie/datePublished' in mitem:
+				self.releasedate = mitem['http://schema.org/Movie/datePublished']
+			if 'http://schema.org/Movie/description' in mitem:
+				self.shortdescription = mitem['http://schema.org/Movie/description']
+			if 'http://schema.org/Movie/director' in mitem:
+				_dir = mitem['http://schema.org/Movie/director']
+				self.director = _dir
+			if 'http://schema.org/Movie/duration' in mitem:
+				self.runtime = mitem['http://schema.org/Movie/duration']
+			if 'http://schema.org/Movie/genre' in mitem:
+				_genre = mitem['http://schema.org/Movie/genre']
+				self.genre = _genre
 
 		AGG_RATE_VALUE = 'http://schema.org/AggregateRating/ratingValue'
 		aggRates = []

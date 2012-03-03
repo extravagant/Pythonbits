@@ -55,7 +55,7 @@
 		&lt;h\d&gt;&lt;a href=&quot;/mpaa&quot;&gt;MPAA&lt;/a&gt;:&lt;/h\d&gt;\n?&lt;div class=&quot;info-content&quot;&gt;\n*([^&lt;\n]+)
 	</string>
 	<string name="google_youtube_url">
-		http://www.google.com/search?hl=en&amp;q=site%%3Ayoutube.com+%s
+		http://www.google.com/search?hl=en&amp;q=site%%3Ayoutube.com+trailer+%s
 	</string>
 	<string name="wikipedia_url">
 		http://en.wikipedia.org/wiki/[^&quot;]+

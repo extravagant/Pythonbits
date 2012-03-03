@@ -46,6 +46,7 @@ import json
 from BeautifulSoup import BeautifulSoup
 from minus_api import MinUsAPI
 import MultipartPostHandler
+from opensubtitles import OpenSubtitlesClient, TEST_USER_AGENT, hash_filename
 from xml.dom.minidom import Document, parse
 from hashlib import md5 # for user error feedback reports
 
@@ -950,6 +951,22 @@ if __name__ == "__main__":
 			print "Wikipedia url: %s" % movie.wikiurl
 		if movie.findTrailer():
 			print "Trailer: %s" % movie.trailerurl
+		file_size, file_hash = hash_filename( filename )
+		# FIXME: update this when we are assigned an actual UA
+		user_agent = TEST_USER_AGENT
+		username = ''
+		password = ''
+		osub = OpenSubtitlesClient( user_agent )
+		osub.LogIn( username, password )
+		sub_results = osub.SearchSubtitles( file_size, file_hash )
+		osub.LogOut()
+		if sub_results:
+			links = []
+			for it in sub_results:
+				links.append(
+					'[url=%s]%s[/url]' % (
+					it['SubDownloadLink'], it['ISO639'], ) )
+			print 'Subtitles: %s' % ' | '.join( links )
 		print movie.overview()
 	elif tv_episode:
 		interesting_fields = [

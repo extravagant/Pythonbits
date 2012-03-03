@@ -115,7 +115,7 @@
 		https://github.com/Ichabond/Pythonbits/raw/master/config.xml
 	</string>
 	<string name="google_youtube_result_re">
-		&lt;a href=&quot;(http://www.youtube.com/watch\?v=[\w\d]+)&quot; class=l&gt;(.*?)(?=&lt;/a&gt;)
+        href=.(http://.*youtube.com/watch\?v=[^&amp;]+). class=(?:['"])?l(?:['"])[^&gt;]*&gt;([^&lt;]+)
 	</string>
 	<string name="tvrage_quickinfo">
 		http://services.tvrage.com/tools/quickinfo.php?show=%(query)s&amp;ep=%(episode_cross)s

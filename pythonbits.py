@@ -123,6 +123,7 @@ class _MyOpener(urllib.FancyURLopener):
 class PythonbitsConfig:
 	"""Class for holding pythonbits config strings. read() or create_dom() must be called before first use. Access strings through obj.strings[key]"""
 	def __init__(self):
+		global __logerror
 		self.strings={}
 		self.file=tempdir()+"config.xml"
 		if not os.path.exists(self.file):
@@ -649,7 +650,7 @@ class ScreenExtractor(object):
 				["ffmpeg", "-i", self.media],
 				stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		except OSError:
-			raise Exception("Error: Ffmpeg not installed,\n" \
+			raise Exception("Error: Ffmpeg not installed,\n" + \
 				" refer to http://www.ffmpeg.org/download.html for installation")
 		ffmpeg_out = ffmpeg.stdout.read()
 		ffmpeg_duration = re.findall(r'Duration:\D(\d{2}):(\d{2}):(\d{2})', ffmpeg_out)

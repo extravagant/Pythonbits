@@ -448,10 +448,10 @@ class SearchImdb(object):
 		if self.rating:
 			overview += "\n%sRating:%s " % format + self.rating
 		if self.director:
-			if len(self.director) > 1:
+			if type(self.director) == list and len(self.director) > 1:
 				overview += "\n%sDirectors:%s " % format + " | ".join(self.director)
 			else:
-				overview += "\n%sDirector:%s " % format + " | ".join(self.director)
+				overview += "\n%sDirector:%s " % format + self.director
 		if self.languages:
 			if len(self.languages) > 1:
 				overview += "\n%sLanguages:%s " % format + " | ".join(self.languages)

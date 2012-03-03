@@ -2,7 +2,8 @@ __docformat__ = 'restructuredtext en'
 import logging
 import os
 import stat
-import httplib
+# we *must* use urllib2 otherwise sending data uses x-www-form-urlencoded
+import urllib2
 import xmlrpclib
 
 TEST_USER_AGENT = 'OS Test User Agent'
@@ -18,58 +19,66 @@ class SizeError(Exception):
         self.size = size
 class BadStatus( Exception ):
     """
-    Raised when the opensubtitles server does not reply 200 OK
+    Raised when the OpenSubtitles server does not reply 200 OK
     :param status: the status that the server _did_ respond with.
     """
     def __init__(self, status):
         Exception.__init__(self)
         self.status = status
+    def __str__(self):
+        return repr(self)
     def __repr__(self):
         return 'The server responded with "status":%s' % self.status
 class NoDataKey( Exception ):
     """
-    Raised when the opensubtitles answer does not contain 'data'
+    Raised when the OpenSubtitles answer does not contain 'data'
     :param result: the map that the server _did_ respond with.
     """
     def __init__(self, result):
         Exception.__init__(self)
         self.result = result
+    def __str__(self):
+        return repr(self)
     def __repr__(self):
         return 'The server responded with %s' % self.result
 class NoStatusKey( Exception ):
     """
-    Raised when the opensubtitles answer does not contain 'status'
+    Raised when the OpenSubtitles answer does not contain 'status'
     :param result: the map that the server _did_ respond with.
     """
     def __init__(self, result):
         Exception.__init__(self)
         self.result = result
+    def __str__(self):
+        return repr(self)
     def __repr__(self):
         return 'The server responded with %s' % self.result
 class NoTokenKey( Exception ):
     """
-    Raised when the opensubtitles answer does not contain 'token'
+    Raised when the OpenSubtitles answer does not contain 'token'
     :param result: the map that the server _did_ respond with.
     """
     def __init__(self, result):
         Exception.__init__(self)
         self.result = result
+    def __str__(self):
+        return repr(self)
     def __repr__(self):
         return 'The server responded with %s' % self.result
 
 class OpenSubtitlesClient(object):
     ENDPOINT_URL = 'http://api.opensubtitles.org/xml-rpc'
     # ENDPOINT_URL = 'http://localhost:8000/xml-rpc'
-    def __init__(self):
-        self.endpoint = OpenSubtitlesClient.ENDPOINT_URL
+    def __init__(self, user_agent ):
         self.LOG = logging.getLogger('OpenSubtitlesClient')
+        self.endpoint = OpenSubtitlesClient.ENDPOINT_URL
+        self.lang_code = 'eng'
         self.token = None
-    def LogIn(self, login, password, user_agent):
+        self.user_agent = user_agent
+
+    def LogIn(self, login, password ):
         methodname = 'LogIn'
-        lang_code = 'eng'
-        if len(username) == 0:
-            lang_code = ''
-        params = (login, password, lang_code, user_agent)
+        params = (login, password, self.lang_code, self.user_agent )
         res = self._invoke( params, methodname )
         if 'status' not in res:
             self.LOG.error(
@@ -90,13 +99,26 @@ class OpenSubtitlesClient(object):
         :param file_size: the exact size in bytes of your file.
         :param file_hash: the hash code as computed by `hash_filename`
         :returns: a list of maps containing the query results
+        :raise ValueError: if the ``file_size`` is not positive or
+                            if the ``file_hash`` is empty
         :raise NoStatusKey: if the result did not contain a 'status' key
         :raise BadStatus: the server responded with a non-200 status
         :raise NoDataKey: if the response did not contain a 'data' key
         """
         methodname = 'SearchSubtitles'
-        query_list = [ {'moviebytesize':file_size, 'moviehash':file_hash} ]
-        params = (self.token, query_list )
+        if not file_size:
+            raise ValueError('file_size is required')
+        if not file_hash:
+            raise ValueError('file_hash is required')
+        query_map = {}
+        # and it has to be of XML-RPC type "double"
+        file_size = float(file_size)
+        query_map['moviebytesize']=file_size
+        query_map['moviehash']=file_hash
+        # this is actually a CSV, so tack on more if you want
+        query_map['sublanguageid']='all'
+        query_list = [ query_map ]
+        params = ( self.token, query_list )
         res = self._invoke( params, methodname )
         if not res:
             return None
@@ -136,53 +158,13 @@ class OpenSubtitlesClient(object):
         """
         req = xmlrpclib.dumps( params, methodname )
         self.LOG.debug(
-            "[%s]::REQ=%s", methodname, repr(req) )
-        # req_gz = xmlrpclib.gzip_encode( req )
-        req_gz = req
-        send_gz = False
-        del req
-        # we need all of this tomfoolery because we have to
-        # indicate that the content has been gzip-ed, and to
-        # indicate that we accept gzip responses
-        http_proxy = os.getenv('http_proxy')
-        if http_proxy is not None:
-            _, netloc, _, _, _ = httplib.urlsplit( http_proxy )
-            path = self.endpoint
-        else:
-            _, netloc, path, _, _ = httplib.urlsplit( self.endpoint )
-        conn = httplib.HTTPConnection( netloc )
-        conn.set_debuglevel( 10 )
-        conn.putrequest('POST', path, skip_accept_encoding=1 )
-        # conn.putheader( 'Accept-Encoding', 'gzip' )
-        if send_gz:
-            conn.putheader( 'Content-Encoding', 'gzip' )
-        conn.putheader( 'Content-Length', str(len(req_gz)))
-        conn.putheader( 'Connection', 'close' )
-        conn.endheaders()
-        conn.send( req_gz )
-        del req_gz
-        http_res = conn.getresponse()
-        self.LOG.debug(
-            'HTTP Response := status:%s headers:%s',
-            http_res.status, http_res.getheaders())
-        if http_res.status != 200:
-            raise IOError('Bogus HTTP response: %s' % http_res.status)
-        ce = http_res.getheader('content-encoding')
-        res_gz = http_res.read()
+            "[%s]::REQ=%s", methodname, req )
+        http_headers = { 'User-Agent':self.user_agent,
+                         'Content-Type':'text/xml; charset="UTF-8"'}
+        http_req = urllib2.Request( self.endpoint, req, http_headers )
+        http_res = urllib2.urlopen( http_req )
+        res_xml = http_res.read()
         http_res.close()
-        conn.close()
-        do_gzip = ce is not None and 'gzip' == ce.lower()
-        if do_gzip:
-            try:
-                res_xml = xmlrpclib.gzip_decode( res_gz )
-            except ValueError:
-                self.LOG.error(
-                    'Unable to gunzip %s', repr(res_gz), exc_info=1)
-                # good luck!
-                res_xml = res_gz
-        else:
-            res_xml = res_gz
-        del res_gz
         self.LOG.debug(
             "[%s]::RES.xml=%s", methodname, repr(res_xml) )
         res = xmlrpclib.loads( res_xml )
@@ -209,11 +191,17 @@ def read_uint64( f ):
         j = ord(f.read(1)) & 0xFFFFFFFFFFFFFFFF
         # u0 u1 ... u6 u7
         k = long(j << (8 * i)) & 0xFFFFFFFFFFFFFFFFL
-        tmp = tmp | k
+        tmp |= k
     return tmp & 0xFFFFFFFFFFFFFFFFL
 
-def hashFilename( fn ):
+def hash_filename( fn ):
     """
+    Constructs the hash according to the algorithm described
+    at http://trac.opensubtitles.org/projects/opensubtitles/wiki/HashSourceCodes
+
+    This is a fresh implementation using the Public Domain C source,
+    and thus not subject to the GPL.
+
     :param fn: the filename
     :return: the tuple (size, hash-string)
     """
@@ -237,7 +225,7 @@ def hashFilename( fn ):
         cksum = (cksum + read_uint64( f )) & 0xFFFFFFFFFFFFFFFFL
     f.close()
     the_hash = '%016x' % cksum
-    return (siz, the_hash)
+    return siz, the_hash
 
 if __name__ == '__main__':
     __doc__ = """
@@ -250,17 +238,20 @@ hash: 61f7751fc2a72bfb
     import sys
     logging.basicConfig()
     fn = sys.argv[1]
-    res = hashFilename( fn )
+    res = hash_filename( fn )
     fs = res[0]
     h = res[1]
     username = ''
     password = ''
     print "FILE(%s)=%s %s" % ( fn, fs, h )
-    client = OpenSubtitlesClient()
+    client = OpenSubtitlesClient( TEST_USER_AGENT )
     client.set_debug( os.getenv('OSC_DEBUG') is not None )
-    client.LogIn( username, password, TEST_USER_AGENT)
+    client.LogIn( username, password )
     results = client.SearchSubtitles( fs, h )
     client.LogOut()
+    if not results:
+        print >> sys.stderr, "Sorry, no results"
+        sys.exit( 1 )
     for x in results:
         for k in x.keys():
             v = x[k]

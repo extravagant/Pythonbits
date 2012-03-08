@@ -6,7 +6,7 @@ import stat
 import urllib2
 import xmlrpclib
 
-TEST_USER_AGENT = 'OS Test User Agent'
+USER_AGENT = 'Pythonbits 1'
 
 class SizeError(Exception):
     """
@@ -236,6 +236,7 @@ DUMMY RAR file (2 565 922 bytes, 4 295 033 890 after RAR unpacking)
 hash: 61f7751fc2a72bfb
     """
     import sys
+    TEST_USER_AGENT = 'OS Test User Agent'
     logging.basicConfig()
     fn = sys.argv[1]
     res = hash_filename( fn )
@@ -244,7 +245,7 @@ hash: 61f7751fc2a72bfb
     username = ''
     password = ''
     print "FILE(%s)=%s %s" % ( fn, fs, h )
-    client = OpenSubtitlesClient( TEST_USER_AGENT )
+    client = OpenSubtitlesClient( USER_AGENT )
     client.set_debug( os.getenv('OSC_DEBUG') is not None )
     client.LogIn( username, password )
     results = client.SearchSubtitles( fs, h )
